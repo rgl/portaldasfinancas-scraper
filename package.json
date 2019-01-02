@@ -1,0 +1,11 @@
+{
+    "name": "portaldasfinancas-scraper",
+    "version": "1.0.0",
+    "description": "scrape www.portaldasfinancas.gov.pt for data",
+    "main": "main.js",
+    "author": "Rui Lopes <rgl@ruilopes.com>",
+    "license": "MIT",
+    "dependencies": {
+        "puppeteer": "^1.11.0"
+    }
+}
