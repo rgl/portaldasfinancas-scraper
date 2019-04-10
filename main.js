@@ -40,7 +40,7 @@ async function gotoUrl(page, url, credentials) {
     // login if needed.
     if ((await page.url()).startsWith(SSO_URL_PREFIX)) {
         await page.type("input#username", credentials.username);
-        await page.type("input#password", credentials.password);
+        await page.type("input#password-nif", credentials.password);
         await page.click("button#sbmtLogin");
         // await page.waitForNavigation({
         //     waitUntil: "networkidle2"
