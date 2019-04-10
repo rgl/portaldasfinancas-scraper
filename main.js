@@ -77,27 +77,34 @@ async function gotoUrl(page, url, credentials) {
 //      Adesão ViaCTT Data Fim: ""
 //      Adesão ViaCTT Data Início: ""
 async function getPersonalData(page, url, credentials) {
-    await gotoUrl(page, url, credentials);
-    return await page.evaluate(() => {
-        var errorBox = document.querySelector(".redBoxBody");
-        if (errorBox) {
-            throw "error getting personal data: " + errorBox.innerText;
-        }
-        var titleElements = document.querySelectorAll(".fieldTitleBold");
-        var valueElements = document.querySelectorAll(".fieldValue");
-        var valueIndex = -1;
-        var prefix = "";
-        var properties = {};
-        titleElements.forEach((titleElement) => {
-            const name = titleElement.innerText;
-            if (titleElement.classList.contains("blueBackground")) {
-                prefix = name + " ";
-            } else {
-                properties[prefix+name] = valueElements[++valueIndex].innerText.trim();
+    // this page is quite unreliable; but it normally works on the first 5 retries.
+    while (true) {
+        await gotoUrl(page, url, credentials);
+        const personalData = await page.evaluate(() => {
+            var errorBox = document.querySelector(".redBoxBody");
+            if (errorBox) {
+                throw "error getting personal data: " + errorBox.innerText;
             }
+            var titleElements = document.querySelectorAll(".fieldTitleBold");
+            var valueElements = document.querySelectorAll(".fieldValue");
+            var valueIndex = -1;
+            var prefix = "";
+            var properties = {};
+            titleElements.forEach((titleElement) => {
+                const name = titleElement.innerText;
+                if (titleElement.classList.contains("blueBackground")) {
+                    prefix = name + " ";
+                } else {
+                    properties[prefix+name] = valueElements[++valueIndex].innerText.trim();
+                }
+            });
+            return properties;
         });
-        return properties;
-    });
+        if ("NIF" in personalData) {
+            return personalData;
+        }
+        console.log("Retrying getting personal data...");
+    }
 }
 
 // returns an array of these objects:
