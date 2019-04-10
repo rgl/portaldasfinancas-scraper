@@ -133,6 +133,48 @@ async function getRealEstate(page, url, credentials) {
     return data;
 }
 
+async function getPdf(page, i) {
+    const pdfBinaryString = await page.evaluate(i => {
+        return new Promise(async (resolve, reject) => {
+            const data = new URLSearchParams();
+            var url = null;
+            if (i.tipo == "R" && i.cadR == "S") {
+                url = "https://www.portaldasfinancas.gov.pt/pt/ca/cadernetaPredialContribuinte.jsp";
+                data.set("freguesia", i.frg);
+                data.set("tipopredio", i.tipo);
+                data.set("seccao", i.sec);
+                data.set("artigo", i.art);
+                data.set("arvcol", i.arv);
+            } else if (i.tipo == "U" && i.cad == "S") {
+                url = "https://www.portaldasfinancas.gov.pt/pt/Pat/externalBinary.jsp";
+                data.set("body", "/external/matriz/cadernetaMatrizNet.jsp");
+                data.set("PredioId", i.id);
+            } else {
+                resolve(null);
+                return;
+            }
+            const response = await fetch(
+                url,
+                {
+                    method: "POST",
+                    body: data,
+                }
+            );
+            const blob = await response.blob();
+            if (!blob.type.startsWith("application/pdf")) {
+                reject("Invalid response.type " + response.type);
+                return;
+            }
+            //debugger;
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result);
+            reader.onerror = () => reject("Error occurred while reading binary string");
+            reader.readAsBinaryString(blob);
+        });
+    }, i);
+    return Buffer.from(pdfBinaryString, "binary").toString("base64");
+}
+
 async function main() {
     if (process.argv.length != 4) {
         throw "you must define the nif and password on the command line"
@@ -153,9 +195,18 @@ async function main() {
         password: password,
     };
 
-    const browser = await puppeteer.launch({
-        headless: true
-    });
+    const debug = false;
+
+    var browserConfig = {};
+    if (debug) {
+        browserConfig = {
+            headless: false,
+            slowMo: 250,
+            devtools: true,
+        };
+    }
+
+    const browser = await puppeteer.launch(browserConfig);
     try {
         const page = await browser.newPage();
 
@@ -167,7 +218,7 @@ async function main() {
             name: personalData["Nome"],
             dob: personalData["Data Nascimento"],
             sex: personalData["Sexo"][0],
-            data: realEstate.map((i) => {
+            data: await Promise.all(realEstate.map(async (i) => {
                 return {
                     id: i.id,
                     parish: i.loc,
@@ -178,12 +229,19 @@ async function main() {
                     year: i.ano,
                     initial_value: i.vIni,
                     current_value: i.val,
+                    pdf: await getPdf(page, i),
                 };
-            }),
+            })),
         };
         const filename = `real-estate-${credentials.username}.json`;
         console.log(`writing data to ${filename}...`);
         fs.writeFileSync(filename, JSON.stringify(data, null, 4));
+        for (const d of data.data) {
+            const filename = `real-estate-${credentials.username}-${d.title}.pdf`;
+            console.log(`writing pdf to ${filename}...`);
+            const buffer = Buffer.from(d.pdf, "base64");
+            fs.writeFileSync(filename, buffer);
+        }
     } finally {
         await browser.close();
     }

@@ -1,3 +1,4 @@
 node_modules/
 SECRETS.md
 real-estate-*.json
+*.pdf
